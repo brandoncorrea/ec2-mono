@@ -94,12 +94,14 @@ runs:
         ssh-private-key: ${{ inputs.ssh-private-key }}
 
     - name: Scan SSH Keys
+      shell: sh
       run: |
         EC2_PUBLIC_IP=$(aws ec2 describe-instances --instance-ids ${{ env.EC2_NEW_INSTANCE_ID }} --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
         echo "EC2_PUBLIC_IP=$EC2_PUBLIC_IP" >> $GITHUB_ENV
         ssh-keyscan -H $EC2_PUBLIC_IP >> ~/.ssh/known_hosts
 
     - name: Install Service
+      shell: sh
       run: |
         WORKING_DIRECTORY=$(pwd)
         scp -r $WORKING_DIRECTORY ${{ inputs.ssh-user }}@${{ env.EC2_PUBLIC_IP }}:~/${{ inputs.app-name }}
@@ -123,6 +125,7 @@ runs:
         timeout: 600000
 
     - name: Allocate Elastic IP Address
+      shell: sh
       run: |
         ALLOCATION_ID=$(aws ec2 describe-addresses \
           --filters "Name=tag:app,Values=${{ inputs.app-name }}" "Name=tag:env,Values=${{ inputs.env-name }}" \
@@ -132,8 +135,10 @@ runs:
 
     - name: Delete old instances if they exist
       if: env.EC2_OLD_INSTANCE_IDS != ''
+      shell: sh
       run: aws ec2 terminate-instances --instance-ids ${{ env.EC2_OLD_INSTANCE_IDS }}
 
     - name: Cleanup new instance if job fails
       if: failure() && env.EC2_NEW_INSTANCE_ID != ''
+      shell: sh
       run: aws ec2 terminate-instances --instance-ids ${{ env.EC2_NEW_INSTANCE_ID }}
