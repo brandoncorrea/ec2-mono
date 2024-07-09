@@ -25,10 +25,20 @@ inputs:
   aws-key-name:
     description: FIXME
     required: true
+  ssh-private-key:
+    description: FIXME
+    required: true
+  ssh-user:
+    description: FIXME
+    required: false
+    default: ubuntu
   app-name:
     description: FIXME
     required: true
   env-name:
+    description: FIXME
+    required: true
+  install:
     description: FIXME
     required: true
 
@@ -77,3 +87,53 @@ runs:
       run: |
         aws ec2 wait instance-running --instance-ids ${{ env.EC2_NEW_INSTANCE_ID }}
         aws ec2 wait instance-status-ok --instance-ids ${{ env.EC2_NEW_INSTANCE_ID }}
+
+    - name: Set up SSH key
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ inputs.ssh-private-key }}
+
+    - name: Scan SSH Keys
+      run: |
+        EC2_PUBLIC_IP=$(aws ec2 describe-instances --instance-ids ${{ env.EC2_NEW_INSTANCE_ID }} --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+        echo "EC2_PUBLIC_IP=$EC2_PUBLIC_IP" >> $GITHUB_ENV
+        ssh-keyscan -H $EC2_PUBLIC_IP >> ~/.ssh/known_hosts
+
+    - name: Install Service
+      run: |
+        WORKING_DIRECTORY=$(pwd)
+        scp -r $WORKING_DIRECTORY ${{ inputs.ssh-user }}@${{ env.EC2_PUBLIC_IP }}:~/${{ inputs.app-name }}
+        ssh -T ${{ inputs.ssh-user }}@${{ env.EC2_PUBLIC_IP }} << 'EOF'
+          cd ${{ inputs.app-name }}
+
+          echo "Updating Package Manager"
+          sudo apt-get update -y
+
+          echo "Upgrading Package Manager"
+          sudo apt-get upgrade -y
+
+          ${{ inputs.install }}
+        EOF
+
+    - name: Wait for instance to be ready
+      uses: iFaxity/wait-on-action@v1.2.1
+      with:
+        resource: https://${{ env.EC2_PUBLIC_IP }}
+        interval: 1000
+        timeout: 600000
+
+    - name: Allocate Elastic IP Address
+      run: |
+        ALLOCATION_ID=$(aws ec2 describe-addresses \
+          --filters "Name=tag:app,Values=${{ inputs.app-name }}" "Name=tag:env,Values=${{ inputs.env-name }}" \
+          --query 'Addresses[0].AllocationId' \
+          --output text)
+        aws ec2 associate-address --instance-id ${{ env.EC2_NEW_INSTANCE_ID }} --allocation-id $ALLOCATION_ID
+
+    - name: Delete old instances if they exist
+      if: env.EC2_OLD_INSTANCE_IDS != ''
+      run: aws ec2 terminate-instances --instance-ids ${{ env.EC2_OLD_INSTANCE_IDS }}
+
+    - name: Cleanup new instance if job fails
+      if: failure() && env.EC2_NEW_INSTANCE_ID != ''
+      run: aws ec2 terminate-instances --instance-ids ${{ env.EC2_NEW_INSTANCE_ID }}
