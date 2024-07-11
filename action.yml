@@ -3,44 +3,46 @@ description: FIXME
 
 inputs:
   aws-access-key-id:
-    description: FIXME
+    description: Your AWS Access Key ID
     required: true
   aws-secret-access-key:
-    description: FIXME
+    description: Your AWS Secret Access Key
     required: true
   aws-region:
-    description: FIXME
-    required: true
+    description: The AWS region being deploy to
+    required: false
+    default: us-east-1
   aws-image-id:
-    description: FIXME
+    description: The image to build the instance from (Default is Ubuntu 24.04)
     required: false
     default: ami-04a81a99f5ec58529
   aws-instance-type:
-    description: FIXME
+    description: The type of instance you'd like to use
     required: false
     default: t2.micro
   aws-security-group-ids:
-    description: FIXME
+    description: Any security groups you'd like to include on the instance. One of these will need to have SSH access.
     required: true
   aws-key-name:
-    description: FIXME
+    description: The name of the SSH key created in AWS
     required: true
   ssh-private-key:
-    description: FIXME
+    description: The private key associated with aws-key-name
     required: true
   ssh-user:
-    description: FIXME
+    description: The user that will be installing the application
     required: false
     default: ubuntu
   app-name:
-    description: FIXME
+    description: A unique name for your application. Pair with env-name to make unique among all of your deployed services.
     required: true
   env-name:
-    description: FIXME
+    description: A unique environment for your application. Pair with app-name to make unique among all of your deployed services.
     required: true
   install:
-    description: FIXME
-    required: true
+    description: The commands required to install and run your application
+    required: false
+    default: ''
 
 runs:
   using: 'composite'
